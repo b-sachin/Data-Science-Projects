@@ -1,0 +1,207 @@
+---
+title: "Activity Tracker Data Analysis"
+author: "Sachin B."
+output: 
+  html_document:
+    keep_md: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## 1. Loading and preprocessing the data
+
+### 1.1. Code for reading in the dataset 
+```{r}
+
+# extract "activity.csv" from "activity.zip" file
+unzip("activity.zip",overwrite=TRUE)
+
+# read data from "activity.csv" into "df" dataframe
+df = read.csv("activity.csv")
+
+# understanding data stored in df
+str(df)
+
+```
+
+### 2.2. Code for processing the data ( Converting date from "Character" format to "Date" Format)
+```{r}
+
+df$date = as.Date(df$date,"%Y-%m-%d")
+
+str(df)
+```
+
+## 2. What is mean total number of steps taken per day?
+
+### 2.1. Remove incomplete observation
+```{r}
+
+df1=df[complete.cases(df), ]
+str(df1)
+```
+
+### 2.2. Calculate the total number of steps taken per day
+```{r}
+
+daysteps = aggregate(steps ~ date, data = df1, sum)
+
+head(daysteps)
+    
+```
+
+### 2.3 Histogram of the total number of steps taken each day
+
+```{r}
+
+hist(daysteps$steps, xlab="Number of Steps", main="Histogram of Steps Per Day, Oct-Nov 2012")
+    
+```
+
+### 2.4 The mean and median of the total number of steps taken per day
+
+```{r}
+
+daysteps_mean = mean(daysteps$steps)
+cat("The mean of the total number of steps taken per day is :",daysteps_mean)
+
+daysteps_median = median(daysteps$steps)
+cat("\nThe median of the total number of steps taken per day is: ",daysteps_median)
+
+```
+
+<hr>
+
+## 3. What is the average daily activity pattern?
+
+### 3.1 Time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+
+```{r}
+
+avgpat = aggregate(steps ~ interval, data = df1, mean)
+head(avgpat)
+
+plot(avgpat$interval,avgpat$steps, type = "l" , xlab = "5-minute interval", ylab = "avg. no. of steps taken", main = "Average daily activity pattern")
+
+```
+
+### 3.2 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps
+
+```{r}
+
+# Learning Summary of 'avgpat' dataset
+summary(avgpat)
+
+# 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps
+avgpat[avgpat$steps == max(avgpat$steps),1]
+
+```
+
+## 4. Imputing missing values
+
+### 4.1. Total number of missing values in the dataset (i.e. the total number of rows with NAs)
+
+```{r}
+# Total no. of rows
+nrow(df)
+
+# Total no. of rows without NA vales
+    ## df1 = df[complete.cases(df), ]
+nrow(df1)
+
+# Total no. of rows with NAs
+
+    ## na_records = nrow(df[!complete.cases(df), ])
+ na_records = nrow(df) - nrow(df1)
+ na_records
+
+```
+
+
+### 4.2. the mean for that 5-minute interval is filling in all of the missing values in the dataset
+
+```{r}
+
+
+# Identifying Positions of missing value in original dataset
+na_pos <- which(is.na(df))
+head(na_pos)
+
+
+# Creating a new dataset that is equal to the original dataset but Replacing missing values with the mean for that 5-minute interval.
+
+df2 <- df
+
+for (i in na_pos) {
+  index <- match(df[i,"interval"],avgpat$interval)
+  df2[i,"steps"] <- avgpat[index,"steps"]
+}
+
+```
+
+### 4.3 Histogram of the total number of steps taken each day
+```{r}
+
+df2steps = aggregate(steps ~ date, data = df2, sum)
+head(df2steps)
+
+hist(df2steps$steps, col="steelblue", xlab="Number of Steps", ylab="Number of Days",  main="Histogram of Steps Per Day, Oct-Nov 2012")
+
+```
+
+### 4.4 The mean and median of the total number of steps taken per day
+
+```{r}
+
+df2steps_mean = mean(df2steps$steps)
+cat("The mean of the total number of steps taken per day is :",df2steps_mean)
+
+df2steps_median = median(df2steps$steps)
+cat("\nThe median of the total number of steps taken per day is: ",df2steps_median)
+
+```
+
+### 4.5  Values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+
+```{r}
+
+# NA removed dataset
+summary(daysteps$steps)
+
+# dataset with NA imputed
+summary(df2steps$steps)
+
+```
+
+In Activity dataset, steps per day mean and median doesn't affect much by replacing Na values with mean for that 5-minute slot. But 1st quartile and 3rd quartile values has been raise by around 1000 step counts which is helpful for having significant population for calculation.
+
+
+## 5. Checking for differences in activity patterns between weekdays and weekends
+
+### 5.1. Create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+
+```{r}
+df2$week <- ifelse(weekdays(df2$date) %in% c("Saturday","Sunday"), "weekend", "weekday")
+
+df2$week <- as.factor(df2$week)
+                              
+str(df2)
+
+```
+
+### 5.2. Panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis).
+
+```{r}
+
+weekavg <- aggregate(steps ~ interval + week, df2, mean )
+
+library(ggplot2)
+
+g <- ggplot(weekavg,aes(interval,steps, col = interval))
+
+g+geom_line()+facet_grid(week~.) + labs(x = "Interval", y = "Number of steps", title = "Time Series Plot")
+
+```
