@@ -1,2 +1,2 @@
 # Data-Science-Projects
-This repository shows all the data science project done be Sachin Bhopi in public domain
+This repository shows all the data science project done by Sachin Bhopi in public domain
