@@ -1,0 +1,231 @@
+---
+title: "Top Storm Event Index"
+author: "Sachin B."
+output: 
+  pdf_document: default
+  html_document:
+    keep_md: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Synopsis
+
+Storms and other severe weather events can cause both public health and economic problems for communities and municipalities.
+
+This project involves exploring the U.S. National Oceanic and Atmospheric Administration’s (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+
+This data analysis address the following questions :
+
+1. Across the United States, which types of events are most harmful with respect to population health ?
+2. Across the United States, which types of events have the greatest economic consequences ?  
+
+This analysis shows by aggregating the data by storm events type :
+
+1. Tornado is the harmful event with respect to population health
+2. Flood is the event which have the greatest economic consequences.
+
+<hr>
+
+## 1. Data Processing
+
+### 1.1 Libraries
+
+```{r packages_required, warning=FALSE, cache=FALSE}
+
+# Loading all required libraries 
+library(dplyr)
+library(reshape2)
+library(ggplot2)
+
+```
+
+### 1.2 Download data from Website
+```{r dataset_loading, cache = TRUE}
+
+# download dataset from website
+if(!file.exists("./data")){dir.create("./data")}
+download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2",destfile = "./data/StormData.csv.bz2",method = "curl")
+
+```
+
+### 1.3 Loading and Preprocessing
+```{r dataset_required, cache = TRUE}
+
+# Read required column  from dataset in dataframe 
+df = read.csv(file="./data/StormData.csv.bz2", sep=",", header = TRUE)[ ,c("EVTYPE","FATALITIES","INJURIES","PROPDMG","PROPDMGEXP","CROPDMG","CROPDMGEXP")]
+
+# Remove incomplete observation
+df=df[complete.cases(df), ]
+
+# dataset view
+head(df)
+
+# datatype of columns
+str(df)
+
+# Transforming Event Type as factor
+df$EVTYPE <- factor(df$EVTYPE)
+```
+
+<hr>
+
+### 1.4 Health Impact Analysis
+
+```{r health_impact_analysis, cache=TRUE}
+
+# Calculating sum of fatalities and injuries as per Event Type
+df_casualties <- df %>% 
+                 group_by(EVTYPE) %>%
+                 summarize(fatalities = sum(FATALITIES),
+                 injuries = sum(INJURIES))
+
+# Calculating mean of fatalities and injuries 
+df_casualties <- mutate(df_casualties,mean_of_two = (fatalities+injuries)/2)
+
+# selecting top 10 rows depicting maximum damage
+df_health <- head(arrange(df_casualties,desc(mean_of_two)),10)
+
+# for creating 'fatalities' and 'injuries' a categorical variables
+df_health_melt <- melt(df_health,id.vars = "EVTYPE", measure.vars = c("fatalities","injuries"))
+
+```
+
+<hr>
+
+### 1.5 Economic Impact Analysis
+
+```{r economic_impact_analysis_dataset}
+
+# Selecting rows where damage happened and column required for property damage analysis
+df_economy <- df[,c("EVTYPE","PROPDMG","PROPDMGEXP","CROPDMG","CROPDMGEXP")]
+
+```
+
+
+```{r number_convertor, cache=TRUE}
+
+# character units to number translator table
+NumScale <- data.frame(
+              Name= c("h","H","k","K","m","M","b","B"),
+              Num = c(10^2,10^2,10^3,10^3,10^6,10^6,10^9,10^9)
+              )
+```
+
+
+```{r property_damage, cache=TRUE}
+
+# checking for meaningful labels
+unique(df_economy$PROPDMGEXP)
+
+# convert character units to number and calculate property damage
+df_economy$PROPMUL <- 10^0
+
+for (i in 1:nrow(NumScale)) {
+  df_economy$PROPMUL[df_economy$PROPDMGEXP == NumScale[i,"Name"]] <- NumScale[i,"Num"]
+}
+
+df_economy$PROPTOTAL <- df_economy$PROPDMG * df_economy$PROPMUL
+
+```
+
+
+```{r crop_damage, cache=TRUE}
+
+# checking for meaningful labels
+unique(df_economy$CROPDMGEXP)
+
+# convert character units to number and calculate property damage
+df_economy$CROPMUL <- 10^0
+
+for (i in 1:nrow(NumScale)) {
+  df_economy$CROPMUL[df_economy$CROPDMGEXP == NumScale[i,"Name"]] <- NumScale[i,"Num"]
+}
+
+df_economy$CROPTOTAL <- df_economy$CROPDMG * df_economy$CROPMUL
+
+```
+
+
+```{r economy_impact_analysis, cache=TRUE}
+
+# Calculating sum of property and crop as per Event Type
+df_eco_total <- df_economy %>% 
+                 group_by(EVTYPE) %>%
+                 summarize(property = sum(PROPTOTAL),
+                          crop = sum(CROPTOTAL)
+                          )
+
+# selecting top 10 rows depicting maximum damage
+df_property <- head(arrange(df_eco_total,desc(property)),10)
+df_crop <- head(arrange(df_eco_total,desc(crop)),10)
+
+```
+
+<hr>
+
+## 2. Result
+
+### 2.1 Health Impact Analysis
+
+Question 1: Across the United States, which types of events are most harmful with respect to population health ?
+
+```{r health_impact_analysis_plot}
+
+# Plot: Number of injuries with the most harmful event type
+
+g <- ggplot(data = df_health_melt, aes(x=reorder(EVTYPE,value), y=value, fill = variable))
+
+g + 
+  geom_bar(stat = "identity", position = position_dodge()) + 
+  coord_flip() + 
+  xlab("Event Type") +
+  ylab("Total number of fatalities & injuries") + 
+  labs(fill = "Casulality") +
+  ggtitle("Number of injuries by top 10 Weather Events")
+
+```
+
+Conclusion: The weather event that causes the most harm to public health is Tornadoes. They have shown in the graphs above to be the largest cause of fatalities and injuries due to weather events in the United States.
+
+<hr>
+
+### 2.2 Economic Impact Analysis
+
+Question 2: Across the United States, which types of events hae the greatest economic consequences?
+
+```{r property_damage_plot}
+
+# Plot: Number of damages with the most harmful event type
+
+g <- ggplot(data = df_property, aes(x=reorder(EVTYPE,property), y=property, fill=property))
+
+g + 
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  xlab("Event Type") + 
+  ylab("Damage ($)") + 
+  labs(fill = "Property Damage") + 
+  ggtitle("Property Damage by top 10 Weather Events")
+
+```
+
+```{r crop_damage_plot}
+
+# Plot: Number of damages with the most harmful event type
+
+g <- ggplot(data = df_crop, aes(x=reorder(EVTYPE,crop), y=crop, fill=crop))
+
+g + 
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  xlab("Event Type") + 
+  ylab("Damage ($)") + 
+  labs(fill = "Crop Damage") + 
+  ggtitle("Crop Damage by top 10 Weather Events")
+
+```
+
+Conclusion: 'Drought' is the event which causes maximum impact on crops but 'Flood' is the event which have the greatest economic consequences altogether.
