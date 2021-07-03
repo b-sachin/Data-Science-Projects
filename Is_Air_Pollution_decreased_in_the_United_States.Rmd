@@ -1,0 +1,353 @@
+---
+title: 'Is Air Pollution (PM2.5) decreased in the United States? '
+author: "Mr. Sachin B."
+output: 
+  pdf_document: default
+  html_document:
+    keep_md: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. Introduction:
+
+- Data analysis looking at changes in fine particulate matter (PM) air pollution in the United States using the Environmental Protection Agencies freely available national monitoring data.
+
+- Particulate matter (less than 2.5 microns in diameter) is a fancy name for dust, and breathing in dust might pose health hazards to the population.
+<hr>
+
+-  Our overall hypothesis is that outdoor PM2.5 has decreased on average across the U.S. due to nationwide regulatory requirements arising from the Clean Air Act. 
+- To investigate this hypothesis, we obtained PM2.5 data from the U.S. Environmental Protection Agency which is collected from monitors sited across the U.S. We specifically obtained data for the years 1999 and 2012 (the most recent complete year available). 
+
+<hr>
+
+## 2. Goal: Changes in Fine Particle PM25 Air Pollution in the U.S. from 1999 to 2012
+
+1. on average across the U.S., levels of PM2.5 decreased or not between 1999 and 2012? 
+2. At one individual monitor, are the levels and that the variability of PM2.5 decreased?
+3. Are Most individual states experienced decrease in PM2.5 or not?
+
+<hr>
+
+### 2.1 Dataset
+```{r}
+
+# download data for 'Air Pollution in 1999'
+
+if(!file.exists("./data")){dir.create("./data")}
+download.file("https://raw.githubusercontent.com/jtleek/modules/master/04_ExploratoryAnalysis/CaseStudy/pm25_data/RD_501_88101_1999-0.txt",destfile = "./data/RD_501_88101_1999-0.txt",method = "curl")
+
+
+# download data for 'Air Pollution in 2012'
+
+if(!file.exists("./data")){dir.create("./data")}
+download.file("https://raw.githubusercontent.com/jtleek/modules/master/04_ExploratoryAnalysis/CaseStudy/pm25_data/RD_501_88101_2012-0.txt",destfile = "./data/RD_501_88101_2012-0.txt",method = "curl")
+
+```
+
+```{r}
+# Read in data from 1999
+
+pm0 <- read.table("./data/RD_501_88101_1999-0.txt", comment.char = "#", header = FALSE, sep = "|", na.strings = "")
+
+head(pm0)
+dim(pm0)
+
+
+# Read in data from 2012
+
+pm1 <- read.table("./data/RD_501_88101_2012-0.txt", comment.char = "#", header = FALSE, sep = "|", na.strings = "")
+
+head(pm1)
+dim(pm1)
+
+```
+
+<hr>
+
+### 2.2 Making data ready for Analysis
+
+#### 2.2.1 Adding column names to dataset
+```{r}
+# Reading 1st line in file 
+cnames <- readLines("./data/RD_501_88101_1999-0.txt",1)
+print(cnames)
+
+# Spliting line into vector of string separated by "|"
+cnames <- strsplit(cnames,"|", fixed = TRUE)
+print(cnames)
+
+# converting string vector into valid variable names and applying it to both 'pm0' & 'pm1' column name
+names(pm0) <- make.names(cnames[[1]])
+names(pm1) <- make.names(cnames[[1]])
+
+head(pm0,2)
+head(pm1,2)
+```
+
+
+#### 2.2.2 Converting numeric date to Date format
+```{r}
+# 1999
+dates0 <- pm0$Date
+
+str(dates0)
+
+dates0 <- as.Date(as.character(dates0),"%Y%m%d")
+
+head(dates0)
+
+# 2012
+dates1 <- pm1$Date
+
+str(dates1)
+
+dates1 <- as.Date(as.character(dates1),"%Y%m%d")
+
+head(dates1)
+
+
+```      
+
+```{r}
+pm0$Date <- dates0
+head(pm0$Date)
+
+pm1$Date <- dates1
+head(pm1$Date)
+```
+
+
+## 3. Goal 1: on average across the U.S., levels of PM2.5 decreased or not between 1999 and 2012?  
+
+### 3.1 Seperating pm25 data column i.e. 'Sample.Value'
+```{r}
+x0 <- pm0$Sample.Value
+x1 <- pm1$Sample.Value
+```
+
+### 3.2 exploring pm25 data for year 1999 & 2012
+```{r}
+# 1999
+class(x0)
+str(x0)
+summary(x0)
+
+# 2012
+class(x1)
+str(x1)
+summary(x1)
+```
+
+##### Explanation:
+
+- Max level of "x1" i.e. 2012 data is very high.
+- Min level of "x1" i.e. 2012 data is negative which is practically not possible. It may be a problem with monitor
+- Large number of "NA" Values
+
+#### 3.2.1 Negative Value occurance Investigation
+
+```{r}
+negative <- x1<0
+
+str(negative)
+
+sum(negative,na.rm = TRUE)
+
+mean(negative, na.rm = TRUE)
+```
+
+##### Explanation:
+
+- Percentage of negative values are around 2% which we can ignore.
+
+#### 3.2.2 Negative value occured in particular month/season
+```{r}
+# 2012
+
+# We have already converted Date column in Date format
+## dates1 <- as.Date(as.character(pm1$Date),"%Y%m%d")
+## head(dates1)
+
+# Normal Reading dates by month
+hist(dates1,"month")
+
+hist(dates1[negative],"month")
+```      
+
+##### Explanation:
+
+- Maximum values for negative occurred from December to March but the reason still not clear so it would be worth investigating. But we have different goal to achieve and 2% negative values can be ignored.
+
+### 3.3 Are missing data a Problem?
+
+- if missing values are below 5% then we can ignore it but more than that it will going to affect the analysis.
+```{r}
+# 1999
+mean(is.na(x0))
+
+# 2012
+mean(is.na(x1))
+```
+
+### 3.4 Boxplot
+
+```{r}
+boxplot(x0,x1)
+```
+
+##### Explanation:
+
+- Hard to look at the spread of data.
+- Data is right skewed.
+- Max level of "x1" i.e. 2012 data is very high.
+
+```{r warning=FALSE}
+boxplot(log10(x0),log10(x1))
+
+```
+
+##### Explanation:
+
+- Now we can see median of the data is reduced from 1999 to 2012.
+- Spread of 2012 is increased with lots of outliers 
+
+## 4. Goal 2: At one individual monitor, are the levels and that the variability of PM2.5 decreased?
+
+### 4.1 Find a monitor for New York State that exists in both datasets
+```{r}
+site0 <- unique(subset(pm0,State.Code == 36, c(County.Code, Site.ID)))
+
+site1 <- unique(subset(pm1,State.Code == 36, c(County.Code, Site.ID)))
+
+
+# Join County.Code and Site.ID column together
+
+site0 <- paste(site0[,1],site0[,2], sep = ".")
+
+site1 <- paste(site1[,1],site1[,2], sep = ".")
+
+str(site0)
+str(site1)
+
+# Select only common county code and site ID available in 1999 and 2012
+
+both <- intersect(site0, site1)
+
+str(both)
+
+```
+
+### 4.2 Find how many observations available at each monitor
+```{r}
+
+pm0$county.site <- paste(pm0$County.Code,pm0$Site.ID,sep = ".")
+
+pm1$county.site <- paste(pm1$County.Code,pm1$Site.ID,sep = ".")
+
+cnt0 <- subset(pm0, State.Code ==36 & county.site %in% both)
+
+cnt1 <- subset(pm1, State.Code ==36 & county.site %in% both)
+
+table(cnt0$county.site)
+
+table(cnt1$county.site)
+```
+
+### 4.3 Choose county 63 and side ID 2008
+```{r}
+
+pm0sub <- subset(pm0, State.Code == 36 & county.site == 63.2008)
+pm1sub <- subset(pm1, State.Code == 36 & county.site == 63.2008)
+
+dim(pm0sub)
+dim(pm1sub)
+```
+
+### 4.4 Plot data for 1999 and 2012
+```{r}
+
+# Plot data for 1999
+
+x0sub <- pm0sub$Sample.Value
+dates0 <- pm0sub$Date
+
+plot(dates0,x0sub)
+
+
+# Plot data for 2012
+
+x1sub <- pm1sub$Sample.Value
+dates1 <- pm1sub$Date
+
+plot(dates1,x1sub)
+
+
+## Plot data for both years in same panel
+
+par(mfrow = c(1, 2), mar = c(4, 4, 2, 1))
+plot(dates0, x0sub, pch = 20)
+abline(h = median(x0sub, na.rm = T))
+plot(dates1, x1sub, pch = 20)  
+abline(h = median(x1sub, na.rm = T))
+
+```
+
+##### Explanation:
+
+- Though both the plots are correct but their y-lim must be same range so that it would be easy for comparison
+
+```{r}
+
+rng <- range(x0sub,x1sub, na.rm = TRUE)
+rng
+
+# copy paste earlier plot with 2 panel but add y-lim
+
+par(mfrow = c(1, 2), mar = c(4, 4, 2, 1))
+plot(dates0, x0sub, pch = 20, ylim = rng)
+abline(h = median(x0sub, na.rm = T))
+plot(dates1, x1sub, pch = 20, ylim = rng)  
+abline(h = median(x1sub, na.rm = T))
+```
+
+
+## 5. Goal 3: Are Most individual states experienced decrease in PM2.5 or not?
+
+### 5.1 state-wide mean calculation
+```{r}
+
+head(pm0)
+
+mn0 <- tapply(pm0$Sample.Value,pm0$State.Code,mean,na.rm= TRUE)
+str(mn0)
+summary(mn0)
+
+
+mn1 <- tapply(pm1$Sample.Value,pm1$State.Code,mean,na.rm= TRUE)
+str(mn1)
+summary(mn1)
+```
+
+### 5.2 Makeing separate data frames for states
+```{r}
+
+d0 <- data.frame(state = names(mn0), mean = mn0)
+d1 <- data.frame(state = names(mn1), mean = mn1)
+mrg <- merge(d0, d1, by = "state")
+dim(mrg)
+head(mrg)
+
+```
+
+### 5.3 Plot for states experienced decrease in PM2.5
+```{r}
+
+with(mrg, plot(rep(1, 52), mrg[, 2], xlim = c(.5, 2.5)))
+with(mrg, points(rep(2, 52), mrg[, 3]))
+
+segments(rep(1, 52), mrg[, 2], rep(2, 52), mrg[, 3])
+
+```
